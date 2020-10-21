@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message=FALSE, error=FALSE)
 # Craft Beer and Brewery Analysis
 ## An examination of ABV, IBU, Beer types (particularly IPA & Ale), and geographical trends
 
-## Load necessary libraries and data
+### Load necessary libraries and data
 ```{r}
 library(tidyverse)
 library(gt)
@@ -25,7 +25,7 @@ breweries = read.csv(file.choose(),header = TRUE) #choose Breweries.csv
 beers = read.csv(file.choose(),header = TRUE) #choose Beers.csv
 ```
 
-## Determine missing values
+### Determine missing values
 ```{r}
 sapply(breweries, function(x) sum(is.na(x)))
 sapply(beers, function(x) sum(is.na(x)))
@@ -59,9 +59,9 @@ ggplot(map.df, aes(x=long,y=lat,group=group))+
   coord_map()
 ```
 
-# Breweries per State:
-## Colorado has the most with 47, followed by California with 39.
-## All states and Washington, D.C. have breweries.
+## Breweries per State:
+### Colorado has the most with 47, followed by California with 39.
+### All states and Washington, D.C. have breweries.
 
 # Merge breweries and beer datasets
 ```{r}
@@ -82,8 +82,8 @@ medianIBU = summarise(by_state, IBU=median(IBU,na.rm=TRUE))
 medianABV = summarise(by_state, ABV=median(ABV,na.rm=TRUE))
 medianIBU <- filter(medianIBU, !is.na(IBU))
 medianABV <- filter(medianABV, !is.na(ABV))
-medianIBU %>% arrange(desc(IBU)) %>% gt() %>% tab_header(title="Median IBU by State")
-medianABV %>% arrange(desc(ABV)) %>% gt() %>% tab_header(title="Median ABV by State")
+datatable(medianIBU, rownames=F, filter="top",caption="Median IBU by State",options=list(pageLength=10,scrollX=T))
+datatable(medianABV, rownames=F, filter="top",caption="Median ABV by State",options=list(pageLength=10,scrollX=T))
 medianIBU %>% ggplot(aes(x= fct_reorder(State,IBU), y=IBU, fill=IBU)) + geom_bar(stat="identity") +
   geom_text(aes(State,IBU+1, label=IBU,fill=NULL),data=medianIBU,size=2) + 
   scale_fill_viridis(option = "D") +
@@ -95,10 +95,10 @@ medianABV %>% ggplot(aes(x= fct_reorder(State,ABV), y=ABV, fill=ABV)) + geom_bar
   theme(axis.text=element_text(size=6))
 ```
 
-# Median ABV by State:
-## Ranges from 0.04 (UT) to 0.0625 (KY)
-# Median IBU by State:
-## Ranges from 19 (Wisconsin) to 61 (Maine)
+## Median ABV by State:
+### Ranges from 0.04 (UT) to 0.0625 (KY)
+## Median IBU by State:
+### Ranges from 19 (Wisconsin) to 61 (Maine)
 
 # Identify state with maximum ABV beer and state with maximum IBU beer
 ```{r}
@@ -107,10 +107,10 @@ breweries2[375,]
 invisible(which.max(breweries2$IBU))
 breweries2[1857,]
 ```
-# State with maximum ABV beer:
-## Colorado (Lee Hill Series Vol. 5 - Belgian Style Quadrupel Ale) ABV: 0.128
-# State with maximum IBU beer:
-## Oregon (Bitter Bitch Imperial IPA) IBU: 138
+## State with maximum ABV beer:
+### Colorado (Lee Hill Series Vol. 5 - Belgian Style Quadrupel Ale) ABV: 0.128
+## State with maximum IBU beer:
+### Oregon (Bitter Bitch Imperial IPA) IBU: 138
 
 # Summary statistics and distribution of ABV
 ```{r}
@@ -121,10 +121,10 @@ breweries2 %>% ggplot(aes(x=ABV)) + geom_histogram( color = "white", fill = "#7F
   ggtitle("Distribution of ABV")
 ```
 
-# Summary Statistics:
-## Min: 0.001   Median: 0.056   Max: 0.128    Standard Deviation: 0.0135
-# Distribution:
-## Right-skewed
+## Summary Statistics:
+### Min: 0.001   Median: 0.056   Max: 0.128    Standard Deviation: 0.0135
+## Distribution:
+### Right-skewed
 
 # Relationship between bitterness and alcohol content: scatterplot to visualize
 ```{r}
@@ -133,15 +133,15 @@ breweries2 %>% ggplot(aes(x=ABV, y=IBU, color=IBU, alpha=ABV)) + geom_point(posi
   scale_color_viridis(option="D", name="IBU", direction = -1)
 ```
 
-# Higher IBU appears associated with higher ABV
-## Possible explanation:  High IBU beers have more hops and are more bitter.
-## To balance bitterness, more malt(suger) is added.
-## This sugar and yeast produce higher ABV.
+## Higher IBU appears associated with higher ABV
+### Possible explanation:  High IBU beers have more hops and are more bitter.
+### To balance bitterness, more malt(suger) is added.
+### This sugar and yeast produce higher ABV.
 
 # Investigate difference with respect to IBU and ABV between IPAs and other Ales
-## Replace missing IBU values with median IBU of each style
-## Make dataframe with only Ales and IPAs and standardize values
-## Find optimal number for nearest neighbor classification
+### Replace missing IBU values with median IBU of each style
+### Make dataframe with only Ales and IPAs and standardize values
+### Find optimal number for nearest neighbor classification
 ```{r}
 breweriesFact = breweries2
 breweriesFact$Style = factor(breweriesFact$Style)
@@ -169,8 +169,8 @@ ZAleOrIPAFull %>% ggplot(aes(x = ZABV, y=ZIBU ,color = AleType)) + geom_point() 
 classifications = knn.cv(ZAleOrIPAFull[,c(1,2)], ZAleOrIPAFull$AleType,prob=TRUE, k=29)
 confusionMatrix(table(classifications,ZAleOrIPAFull$AleType)) 
 ```
-# Ale is associated with lower ABV and IBU compared to IPA
-## Using the 29 nearest data points, our model uses ABV and IBU to predict IPA vs. Ale with 89% accuracy.
+## Ale is associated with lower ABV and IBU compared to IPA
+### Using the 29 nearest data points, our model uses ABV and IBU to predict IPA vs. Ale with 89% accuracy.
 
 # Regional trends regarding ABV and IBU
 ## Using 4 US Census regions, examine ABV and IBU
@@ -199,15 +199,15 @@ medianRegionABV %>% ggplot(aes(x= fct_reorder(regions,ABV), y=ABV, fill=ABV)) + 
   ggtitle("Median ABV by Census Region") + xlab("Region")
 ```
 
-# The West Region had the highest median IBU level. 
-## Given that Oregon is part of the West, and had the beer with the single highest IBU level, it is unsuprising that the West is the highest.
+## The West Region had the highest median IBU level. 
+### Given that Oregon is part of the West, and had the beer with the single highest IBU level, it is unsuprising that the West is the highest.
 
-# The West and Mid West both have the highest median ABV levels
-## There is very little discrepentcy between all four regions and more data could change this distribution
+## The West and Mid West both have the highest median ABV levels
+### There is very little discrepancy between all four regions and more data could change this distribution
 
 # Regional trends and major beer categories
-## Group beer styles into seven major groups: IPA/Pale Ale, Ale, Pilsner, Lager, Stout, Wheat, and Other
-## Examine category by census region
+### Group beer styles into seven major groups: IPA/Pale Ale, Ale, Pilsner, Lager, Stout, Wheat, and Other
+### Examine category by census region
 ```{r}
 Styles = breweriesFact %>% mutate(Style, Category = ifelse(grepl("Stout", Style), "Stout",
                                                      ifelse(grepl("Pilsner", Style), "Pilsner",
@@ -238,8 +238,8 @@ CatCountRegion %>% ggplot(aes(x= fct_reorder(regions,n), y=n, fill=fct_relevel(C
   ggtitle("Categories by Census Region") + xlab("Region") + ylab("Proportion")
 ```
 
-# IPA and Ale are the most common of the seven categories in all regions
-## Proportion of each type of craft beer produced by region is similar
+## IPA and Ale are the most common of the seven categories in all regions
+### Proportion of each type of craft beer produced by region is similar
 
 # Examine major beer groups by state
 ```{r}
@@ -265,7 +265,7 @@ ggplot(map.df, aes(x=long,y=lat,group=group))+
   coord_map()
 ```
 
-# IPA is the most common craft beer type throughout in 37 states and District of Columbia.
-## 13 states had Ale as the most common type of craft beer produced.
-## Only one state (WI) had a type of beer other than Ale or IPA as the most common beer type in production.
-## There seems to be a general demand for IPA and Pale Ale, particularly on the east and west coasts
+## IPA is the most common craft beer type throughout in 37 states and District of Columbia.
+### 13 states had Ale as the most common type of craft beer produced.
+### Only one state (WI) had a type of beer other than Ale or IPA as the most common beer type in production.
+### There seems to be a general demand for IPA and Pale Ale, particularly on the east and west coasts
