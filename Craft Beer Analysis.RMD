@@ -31,8 +31,8 @@ sapply(breweries, function(x) sum(is.na(x)))
 sapply(beers, function(x) sum(is.na(x)))
 ```
 # Missing Values:
-## There are 1005 (41.7%) missing IBU values and 62 (2.6%) missing ABV values
-## We will determine if imputing missing values improves any machine learning techniques we apply.
+### There are 1005 (41.7%) missing IBU values and 62 (2.6%) missing ABV values
+### We will determine if imputing missing values improves any machine learning techniques we apply.
 
 # Number of Breweries per State
 ## Create table and heatmap
