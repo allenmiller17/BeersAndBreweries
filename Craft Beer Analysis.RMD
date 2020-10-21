@@ -1,0 +1,271 @@
+---
+title: "Craft Beer Analysis"
+author: "Nicole Norelli & Allen Miller"
+date: "10/15/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message=FALSE, error=FALSE)
+```
+
+# Craft Beer and Brewery Analysis
+## An examination of ABV, IBU, Beer types (particularly IPA & Ale), and geographical trends
+
+## Load necessary libraries and data
+```{r}
+library(tidyverse)
+library(gt)
+library(DT)
+library(viridis)
+library(class)
+library(caret)
+library(e1071)
+breweries = read.csv(file.choose(),header = TRUE) #choose Breweries.csv
+beers = read.csv(file.choose(),header = TRUE) #choose Beers.csv
+```
+
+## Determine missing values
+```{r}
+sapply(breweries, function(x) sum(is.na(x)))
+sapply(beers, function(x) sum(is.na(x)))
+```
+# Missing Values:
+## There are 1005 (41.7%) missing IBU values and 62 (2.6%) missing ABV values
+## We will determine if imputing missing values improves any machine learning techniques we apply.
+
+# Number of Breweries per State
+## Create table and heatmap
+```{r}
+stateCount = count(breweries,State)
+stateCount$State = trimws(stateCount$State, which="both") 
+lookup = data.frame(abb = state.abb, State = state.name) 
+stateCountAbb = stateCount
+colnames(stateCountAbb)[1] = "abb"
+stateCountFullNames = full_join(stateCountAbb,lookup, by="abb") 
+stateCountFullNames$State[8] = "Washington, D.C."
+stateCount %>% arrange(desc(n)) %>% 
+  gt() %>% tab_header(title="Number of Breweries in Each State")
+datatable(stateCount, rownames=F, filter="top",caption="Number of Breweries per State",options=list(pageLength=10,scrollX=T))
+states <- map_data("state")
+stateCountMap = stateCountFullNames
+stateCountMap$region <- tolower(stateCountMap$State)
+map.df <- merge(states,stateCountMap, by="region", all.x=T)
+map.df <- map.df[order(map.df$order),]
+ggplot(map.df, aes(x=long,y=lat,group=group))+
+  geom_polygon(aes(fill=n))+
+  geom_path()+ 
+  scale_fill_viridis(option="D", name="Breweries") + ggtitle("Breweries by State")+
+  coord_map()
+```
+
+# Breweries per State:
+## Colorado has the most with 47, followed by California with 39.
+## All states and Washington, D.C. have breweries.
+
+# Merge breweries and beer datasets
+```{r}
+colnames(beers)[5] = "Brew_ID"
+breweries2 = full_join(breweries, beers, by = "Brew_ID")
+colnames(breweries2)[2] = "Brewery_Name"
+colnames(breweries2)[5] = "Beer_Name"
+breweries2$State = trimws(breweries2$State, which="both")
+head(breweries2,6)
+tail(breweries2,6)
+```
+
+# Compute median ABV and IBU for each state
+## Create bar charts
+```{r}
+by_state = group_by(breweries2,State)
+medianIBU = summarise(by_state, IBU=median(IBU,na.rm=TRUE))
+medianABV = summarise(by_state, ABV=median(ABV,na.rm=TRUE))
+medianIBU <- filter(medianIBU, !is.na(IBU))
+medianABV <- filter(medianABV, !is.na(ABV))
+medianIBU %>% arrange(desc(IBU)) %>% gt() %>% tab_header(title="Median IBU by State")
+medianABV %>% arrange(desc(ABV)) %>% gt() %>% tab_header(title="Median ABV by State")
+medianIBU %>% ggplot(aes(x= fct_reorder(State,IBU), y=IBU, fill=IBU)) + geom_bar(stat="identity") +
+  geom_text(aes(State,IBU+1, label=IBU,fill=NULL),data=medianIBU,size=2) + 
+  scale_fill_viridis(option = "D") +
+  ggtitle("Median IBU by State") + xlab("State") + coord_flip() +
+  theme(axis.text=element_text(size=6))
+medianABV %>% ggplot(aes(x= fct_reorder(State,ABV), y=ABV, fill=ABV)) + geom_bar(stat="identity") +
+  geom_text(aes(State,ABV+.0015, label=ABV,fill=NULL),data=medianABV,size=2) + 
+  scale_fill_viridis(option = "D") + ggtitle("Median ABV by State") + xlab("State") + coord_flip() +
+  theme(axis.text=element_text(size=6))
+```
+
+# Median ABV by State:
+## Ranges from 0.04 (UT) to 0.0625 (KY)
+# Median IBU by State:
+## Ranges from 19 (Wisconsin) to 61 (Maine)
+
+# Identify state with maximum ABV beer and state with maximum IBU beer
+```{r}
+invisible(which.max(breweries2$ABV))
+breweries2[375,]
+invisible(which.max(breweries2$IBU))
+breweries2[1857,]
+```
+# State with maximum ABV beer:
+## Colorado (Lee Hill Series Vol. 5 - Belgian Style Quadrupel Ale) ABV: 0.128
+# State with maximum IBU beer:
+## Oregon (Bitter Bitch Imperial IPA) IBU: 138
+
+# Summary statistics and distribution of ABV
+```{r}
+summary(breweries2$ABV)
+sd(breweries2$ABV, na.rm=T)
+breweries2 %>% ggplot(aes(x=ABV)) + geom_histogram( color = "white", fill = "#7F57BF") + 
+  geom_density(alpha = .6, fill = "white") +
+  ggtitle("Distribution of ABV")
+```
+
+# Summary Statistics:
+## Min: 0.001   Median: 0.056   Max: 0.128    Standard Deviation: 0.0135
+# Distribution:
+## Right-skewed
+
+# Relationship between bitterness and alcohol content: scatterplot to visualize
+```{r}
+breweries2 %>% ggplot(aes(x=ABV, y=IBU, color=IBU, alpha=ABV)) + geom_point(position="jitter") +
+  geom_smooth() + ggtitle("ABV and IBU") + 
+  scale_color_viridis(option="D", name="IBU", direction = -1)
+```
+
+# Higher IBU appears associated with higher ABV
+## Possible explanation:  High IBU beers have more hops and are more bitter.
+## To balance bitterness, more malt(suger) is added.
+## This sugar and yeast produce higher ABV.
+
+# Investigate difference with respect to IBU and ABV between IPAs and other Ales
+## Replace missing IBU values with median IBU of each style
+## Make dataframe with only Ales and IPAs and standardize values
+## Find optimal number for nearest neighbor classification
+```{r}
+breweriesFact = breweries2
+breweriesFact$Style = factor(breweriesFact$Style)
+by_style = group_by(breweriesFact,Style)
+medianIBUbyStyle = summarise(by_style, IBU=median(IBU,na.rm=TRUE))
+medianIBUbyStyleFiltered = medianIBUbyStyle %>% filter(!is.na(IBU)) %>% filter(Style != "")
+breweriesNoIBU = breweries2 %>% filter(is.na(IBU))
+FillNAs = merge(breweriesNoIBU, medianIBUbyStyleFiltered, by="Style")
+FillNAs$IBU = FillNAs$IBU.y
+FillNAs = subset(FillNAs, select = -c(IBU.y, IBU.x))
+breweriesPartial = breweries2 %>% filter(!is.na(IBU))
+IBUImpute = rbind(breweriesPartial, FillNAs)
+AleOrIPAFull = IBUImpute %>% 
+   filter(str_detect(IBUImpute$Style, "\\bAle\\b|\\bIPA\\b"))
+AleOrIPAFull = AleOrIPAFull %>% mutate(AleType = str_detect(Style, "\\bIPA\\b"))
+AleOrIPAFull$AleType[AleOrIPAFull$AleType==TRUE] = "IPA"
+AleOrIPAFull$AleType[AleOrIPAFull$AleType==FALSE] = "Ale" 
+AleOrIPAFull$AleType = factor(AleOrIPAFull$AleType)
+ZAleOrIPAFull = data.frame(ZABV = scale(AleOrIPAFull$ABV), ZIBU = scale(AleOrIPAFull$IBU), AleType = AleOrIPAFull$AleType)
+ZAleOrIPAFull = ZAleOrIPAFull %>% filter(!is.na(ZABV))
+ZAleOrIPAFull %>% ggplot(aes(x = ZABV, y=ZIBU ,color = AleType)) + geom_point() +
+  xlab("Standardized ABV") + ylab("Standardized IBU") + 
+  ggtitle("Standardized ABV and IBU for Ale and IPA (with imputed IBU values)") +
+  scale_color_viridis_d(begin=.25, end = .75)
+classifications = knn.cv(ZAleOrIPAFull[,c(1,2)], ZAleOrIPAFull$AleType,prob=TRUE, k=29)
+confusionMatrix(table(classifications,ZAleOrIPAFull$AleType)) 
+```
+# Ale is associated with lower ABV and IBU compared to IPA
+## Using the 29 nearest data points, our model uses ABV and IBU to predict IPA vs. Ale with 89% accuracy.
+
+# Regional trends regarding ABV and IBU
+## Using 4 US Census regions, examine ABV and IBU
+```{r}
+State <- c("AK", "WA", "OR", "CA", "ID", "NV", "UT", "AZ", "MT", "WY", "CO", "NM", "HI",
+           "ND", "SD", "NE,", "KS", "MN", "IA", "MO", "WI", "IL", "IN", "MI", "OH", 
+           "TX", "OK", "AR", "LA", "MS", "TN", "KY", "WV", "AL", "FL", "GA", "SC", "NC", "VA", "DC", "MD", "DE", 
+           "PA", "NY", "VT", "NH", "ME", "MA", "CT", "RI", "NJ")
+regions <- c("West", "West", "West", "West", "West", "West", "West", "West", "West", "West", "West", "West", "West", 
+             "Mid West", "Mid West", "Mid West", "Mid West", "Mid West", "Mid West", "Mid West", "Mid West", "Mid West", 
+             "Mid West", "Mid West", "Mid West", 
+             "South", "South", "South", "South", "South", "South", "South", "South", "South", "South", "South", "South", 
+             "South", "South", "South", "South", "South", 
+             "North East", "North East", "North East", "North East", "North East", "North East", "North East", "North East", 
+             "North East")
+statesRegions <- data.frame(State, regions)
+breweries3 <- merge(breweries2, statesRegions, by = "State")
+by_region = group_by(breweries3,regions)
+medianRegionIBU = summarise(by_region, IBU=median(IBU,na.rm=TRUE))
+medianRegionABV = summarise(by_region, ABV=median(ABV,na.rm=TRUE))
+medianRegionIBU %>% ggplot(aes(x= fct_reorder(regions,IBU), y=IBU, fill=IBU)) + geom_bar(stat="identity") +
+  geom_text(aes(regions,IBU+1, label=IBU,fill=NULL),data=medianRegionIBU) + scale_fill_viridis(option = "D") +
+  ggtitle("Median IBU by Census Region") + xlab("Region")
+medianRegionABV %>% ggplot(aes(x= fct_reorder(regions,ABV), y=ABV, fill=ABV)) + geom_bar(stat="identity") +
+  geom_text(aes(regions,ABV+.0015, label=ABV,fill=NULL),data=medianRegionABV) + scale_fill_viridis(option = "D") +
+  ggtitle("Median ABV by Census Region") + xlab("Region")
+```
+
+# The West Region had the highest median IBU level. 
+## Given that Oregon is part of the West, and had the beer with the single highest IBU level, it is unsuprising that the West is the highest.
+
+# The West and Mid West both have the highest median ABV levels
+## There is very little discrepentcy between all four regions and more data could change this distribution
+
+# Regional trends and major beer categories
+## Group beer styles into seven major groups: IPA/Pale Ale, Ale, Pilsner, Lager, Stout, Wheat, and Other
+## Examine category by census region
+```{r}
+Styles = breweriesFact %>% mutate(Style, Category = ifelse(grepl("Stout", Style), "Stout",
+                                                     ifelse(grepl("Pilsner", Style), "Pilsner",
+                                                      ifelse(grepl("Pilsener", Style), "Pilsner",
+                                                      ifelse(grepl("IPA",Style), "IPA or Pale Ale",
+                                                      ifelse(grepl("Pale Ale",Style), "IPA or Pale Ale",
+                                                      ifelse(grepl("Tripel",Style), "IPA or Pale Ale",
+                                                      ifelse(grepl("Lager",Style),  "Lager",
+                                                      ifelse(grepl("Marzen",Style), "Lager",
+                                                      ifelse(grepl("Bock",Style), "Lager",
+                                                      ifelse(grepl("Doppelbock",Style), "Lager",
+                                                      ifelse(grepl("Wheat",Style), "Wheat",
+                                                      ifelse(grepl("Hefeweizen", Style), "Wheat",
+                                                      ifelse(grepl("Witbier", Style), "Wheat",
+                                                      ifelse(grepl("Weissbier", Style), "Wheat",
+                                                      ifelse(grepl("Dunkelweizen",Style), "Wheat",
+                                                      ifelse(grepl("Kölsch", Style), "Ale",
+                                                      ifelse(grepl("Altbier",Style), "Ale",
+                                                      ifelse(grepl("Dubbel",Style), "Ale",
+                                                      ifelse(grepl("Ale",Style), "Ale","Other"))))))))))))))))))))
+Styles %>% count(Category) %>% arrange(desc(n)) %>% gt() %>% tab_header(title="Totals per Category")
+breweries4 = merge(Styles, statesRegions, by = "State")
+breweries4$Category = factor(breweries4$Category)
+cat_by_region = group_by(breweries4, regions)
+CatCountRegion = cat_by_region %>% count(Category)
+CatCountRegion %>% ggplot(aes(x= fct_reorder(regions,n), y=n, fill=fct_relevel(Category, c("IPA or Pale Ale","Stout","Pilsner","Ale","Other","Lager","Wheat")))) +
+  geom_bar(stat="identity", position = "fill") + scale_fill_viridis(option = "D", discrete=T, name="Category\nDescending IBU", direction=-1) +
+  ggtitle("Categories by Census Region") + xlab("Region") + ylab("Proportion")
+```
+
+# IPA and Ale are the most common of the seven categories in all regions
+## Proportion of each type of craft beer produced by region is similar
+
+# Examine major beer groups by state
+```{r}
+state_grp = group_by(Styles,State)
+CatCountbyState = state_grp %>% count(Category)
+CatCountbyState = CatCountbyState %>% arrange (State, desc(n))
+datatable(CatCountbyState, rownames=F, filter="top",caption="Category Count by State",options=list(pageLength=10,scrollX=T))
+TopCatbyState = CatCountbyState %>% group_by(State) %>% filter(row_number()==1)
+TopCatbyState$Category = factor(TopCatbyState$Category)
+lookup = data.frame(abb = state.abb, State = state.name) 
+colnames(TopCatbyState)[1] = "abb"
+TopCatFullNames = full_join(TopCatbyState,lookup, by="abb") 
+TopCatFullNames$State[8] = "district of columbia"
+states <- map_data("state")
+CatCountMap = TopCatFullNames
+CatCountMap$region <- tolower(CatCountMap$State)
+map.df <- merge(states,CatCountMap, by="region", all.x=T)
+map.df <- map.df[order(map.df$order),] 
+ggplot(map.df, aes(x=long,y=lat,group=group))+
+  geom_polygon(aes(fill=Category))+
+  geom_path()+ 
+  scale_fill_viridis(discrete = T,option="D") + ggtitle("Most Common Craft Beers by State")+
+  coord_map()
+```
+
+# IPA is the most common craft beer type throughout in 37 states and District of Columbia.
+## 13 states had Ale as the most common type of craft beer produced.
+## Only one state (WI) had a type of beer other than Ale or IPA as the most common beer type in production.
+## There seems to be a general demand for IPA and Pale Ale, particularly on the east and west coasts
